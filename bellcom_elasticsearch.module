@@ -70,14 +70,16 @@ function bellcom_elasticsearch_menu(){
 
 function bellcom_elasticsearch_elasticsearch_connector_search_api_query_alter($query, &$params){
   if (isset($params['body']['query'])) {
-  $query_str = $params['body']['query']['bool']['must'][0]['multi_match']['query'];
-  $params['body']['query'] = array(
-    'function_score' => array(
-      'functions' => _bellcom_elasticsearch_get_boosting($query_str),
-      'query'=> _bellcom_elasticsearch_get_query($query_str)
-    )
-  );
-  $params['body']['size'] = _bellcom_elasticsearch_get_size($query_str);
+    if (isset($params['body']['query']['bool'])) {
+    $query_str = $params['body']['query']['bool']['must'][0]['multi_match']['query'];
+    $params['body']['query'] = array(
+      'function_score' => array(
+        'functions' => _bellcom_elasticsearch_get_boosting($query_str),
+        'query'=> _bellcom_elasticsearch_get_query($query_str)
+      )
+    );
+    $params['body']['size'] = _bellcom_elasticsearch_get_size($query_str);
+    }
   }
 }
 
@@ -104,14 +106,15 @@ function _bellcom_elasticsearch_get_boosting($query_string = null){
   $fields = array_flip($fields);
 
   $boosting = array();
+  $fields_query = array();
   foreach ($results as $kle_term){
     foreach ($fields as $key => $value) {
-      $fields[$key] = $kle_term->tid;
+      $fields_query['node:' . $key] = $kle_term->tid;
     }
     $boosting[] = array(
       'weight' => $kle_term->weight,
       'filter' => array(
-        'term' => $fields,
+        'term' => $fields_query,
       )
     );
   }
@@ -119,7 +122,7 @@ function _bellcom_elasticsearch_get_boosting($query_string = null){
   // making sure, that all found phrase NID are on top of the list (multiplying weight by 100)
   $results = db_query('SELECT * FROM {bellcom_elasticsearch_phrase_catcher} i WHERE :phrase LIKE i.phrase
 			AND nid IS NOT NULL AND (i.from_date IS NULL or i.from_date <= :now)
-			AND  (i.until_date IS NULL or i.until_date >= :now)',
+			AND  (i.until_date IS NULL or i.until_date >= :now) order by i.weight DESC',
     array(':phrase' => $query_string, ':now' => $now))->fetchAll();
 
   foreach ($results as $phrase){
@@ -127,7 +130,7 @@ function _bellcom_elasticsearch_get_boosting($query_string = null){
       'weight' => intval($phrase->weight)*100,
       'filter' => array(
         'term' => array('node:nid' => $phrase->nid)
-      )
+      ),
     );
   }
 
@@ -153,7 +156,7 @@ function _bellcom_elasticsearch_get_query($query_string) {
   // making sure the all found phrase NID are included into the search result
   $results = db_query('SELECT * FROM {bellcom_elasticsearch_phrase_catcher} i WHERE :phrase LIKE i.phrase
 			AND nid IS NOT NULL AND (i.from_date IS NULL or i.from_date <= :now)
-			AND  (i.until_date IS NULL or i.until_date >= :now)',
+			AND  (i.until_date IS NULL or i.until_date >= :now) order by i.weight DESC',
     array(':phrase' => $query_string, ':now' => date('Y-m-d H:i:s', time())))->fetchAll();
   foreach($results as $phrase) {
     $query['bool']['should'][] = array(
@@ -166,13 +169,14 @@ function _bellcom_elasticsearch_get_query($query_string) {
 
 function _bellcom_elasticsearch_get_size($query_string){
   // making sure the all found phrase NID are included into the search result
-  $results = db_query('SELECT exclusive FROM {bellcom_elasticsearch_phrase_catcher} i WHERE :phrase LIKE i.phrase
+  $results = db_query('SELECT exclusive, nid FROM {bellcom_elasticsearch_phrase_catcher} i WHERE :phrase LIKE i.phrase
 	AND nid IS NOT NULL AND (i.from_date IS NULL or i.from_date <= :now)
 	AND  (i.until_date IS NULL or i.until_date >= :now)',
     array(':phrase' => $query_string, ':now' => date('Y-m-d H:i:s', time())))->fetchAll();
 
   foreach($results as $result) {
     if ($result->exclusive) {//if any of the mathcing phrase are set to be exclusive
+      drupal_goto('node/'. $result->nid); 
       return 1;
     }
   }
