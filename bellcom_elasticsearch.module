@@ -11,12 +11,21 @@ module_load_include('inc', 'bellcom_elasticsearch', 'bellcom_elasticsearch.admin
 function bellcom_elasticsearch_menu(){
   $items = array();
 
-  $items['admin/config/search/kle'] = array(
-    'title' => 'KLE Weight',
-    'description' => 'Configure the weight of the KLE terms',
+  $items['admin/config/search/term'] = array(
+    'title' => 'Term Weight',
+    'description' => 'Configure the weight of the terms',
     'type' => MENU_NORMAL_ITEM | MENU_LOCAL_TASK,
     'access arguments' => array('administer search_api'),
     'page callback' => 'bellcom_elasticsearch_kle_settings_page',
+    'file' => 'bellcom_elasticsearch.admin.inc',
+  );
+  $items['admin/config/search/term_fields'] = array(
+    'title' => 'Term fields',
+    'description' => 'Term field machine names from content types',
+    'type' => MENU_NORMAL_ITEM | MENU_LOCAL_TASK,
+    'access arguments' => array('administer search_api'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('bellcom_elasticsearch_term_fields'),
     'file' => 'bellcom_elasticsearch.admin.inc',
   );
 
@@ -60,6 +69,7 @@ function bellcom_elasticsearch_menu(){
 
 
 function bellcom_elasticsearch_elasticsearch_connector_search_api_query_alter($query, &$params){
+  if (isset($params['body']['query'])) {
   $query_str = $params['body']['query']['bool']['must'][0]['multi_match']['query'];
   $params['body']['query'] = array(
     'function_score' => array(
@@ -68,6 +78,7 @@ function bellcom_elasticsearch_elasticsearch_connector_search_api_query_alter($q
     )
   );
   $params['body']['size'] = _bellcom_elasticsearch_get_size($query_str);
+  }
 }
 
 function _bellcom_elasticsearch_get_boosting($query_string = null){
@@ -88,12 +99,19 @@ function _bellcom_elasticsearch_get_boosting($query_string = null){
     ->execute()
     ->fetchAll();
 
+  $term_fields = variable_get('bellcom_elasticsearch_term_field_names', 'field_os2web_borger_dk_kle,field_os2web_base_field_kle_ref');
+  $fields = explode(',', $term_fields);
+  $fields = array_flip($fields);
+
   $boosting = array();
   foreach ($results as $kle_term){
+    foreach ($fields as $key => $value) {
+      $fields[$key] = $kle_term->tid;
+    }
     $boosting[] = array(
       'weight' => $kle_term->weight,
       'filter' => array(
-        'term' => array('field_os2web_borger_dk_kle' => $kle_term->tid, 'field_os2web_base_field_kle_ref' => $kle_term->tid)
+        'term' => $fields,
       )
     );
   }

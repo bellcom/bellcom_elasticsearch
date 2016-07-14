@@ -12,10 +12,10 @@ function bellcom_elasticsearch_views_default_views() {
 
   $view = new view();
   $view->name = 'bellcom_elasticsearch_kle_terms';
-  $view->description = 'displays settings for KLE elasticsearch ingegration';
+  $view->description = 'displays settings for elasticsearch ingegration';
   $view->tag = 'default';
   $view->base_table = 'taxonomy_term_data';
-  $view->human_name = 'Bellcom elasticsearch KLE terms';
+  $view->human_name = 'Bellcom elasticsearch terms';
   $view->core = 7;
   $view->api_version = '3.0';
   $view->disabled = FALSE; /* Edit this to true to make a default view disabled initially */

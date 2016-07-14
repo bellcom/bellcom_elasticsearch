@@ -12,7 +12,17 @@ function bellcom_elasticsearch_kle_settings_page(){
 
     return views_embed_view("bellcom_elasticsearch_kle_terms");
 }
+function bellcom_elasticsearch_term_fields($form, $form_state) {
 
+  $form['bellcom_elasticsearch_term_field_names'] = array(
+    '#type' => 'textfield',
+    '#description' => t('User "," to seperate term reference field machine names'),
+    '#default_value' => variable_get('bellcom_elasticsearch_term_field_names', 'field_os2web_borger_dk_kle,field_os2web_base_field_kle_ref'),
+    '#size' => 100,
+  );
+
+  return system_settings_form($form);
+}
 function bellcom_elasticsearch_kle_settings_page_weight_form($tid){
     $kle = bellcom_elasticsearch_get_kle_by_tid($tid);
 
